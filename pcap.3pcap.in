@@ -17,7 +17,7 @@
 .\" WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
 .\" MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
 .\"
-.TH PCAP 3PCAP "25 July 2018"
+.TH PCAP 3PCAP "29 January 2020"
 .SH NAME
 pcap \- Packet Capture library
 .SH SYNOPSIS
@@ -41,6 +41,10 @@ other interface on which the capture should be done, call
 .BR pcap_create (),
 set the appropriate options on the handle, and then activate it with
 .BR pcap_activate ().
+If
+.BR pcap_activate ()
+fails, the handle should be closed with
+.BR pcap_close ().
 .PP
 To obtain a list of devices that can be opened for a live capture, call
 .BR pcap_findalldevs ();
@@ -249,7 +253,7 @@ that device.  A user can be given that privilege by, for example, adding
 that privilege to the user's
 .B defaultpriv
 key with the
-.B usermod (@MAN_ADMIN_COMMANDS@)
+.BR usermod (@MAN_ADMIN_COMMANDS@)
 command.
 .TP
 .B Under HP-UX with DLPI:
@@ -420,7 +424,7 @@ set packet buffer timeout for a not-yet-activated
 .B pcap_t
 for live capture
 .TP
-.BR pcap_set_immediate mode (3PCAP)
+.BR pcap_set_immediate_mode (3PCAP)
 set immediate mode for a not-yet-activated
 .B pcap_t
 for live capture
@@ -648,7 +652,7 @@ from the device.
 Not all handles have such a descriptor available;
 .BR pcap_get_selectable_fd ()
 will return
-.B PCAP_ERROR
+.B \-1
 if no such descriptor is available.  If no such
 descriptor is available, this may be because the device must be polled
 periodically for packets; in that case,
@@ -723,13 +727,12 @@ and
 .BR poll (2)
 .TP
 .BR pcap_get_required_select_timeout (3PCAP)
-if no descriptor usable with
+attempt to get a timeout required for using a
+.B pcap_t
+in calls such as
 .BR select (2)
 and
 .BR poll (2)
-is available for the
-.BR pcap_t ,
-attempt to get a timeout usable with those routines
 .RE
 .SS Filters
 In order to cause only certain packets to be returned when reading
@@ -982,5 +985,5 @@ To report a security issue please send an e-mail to security@tcpdump.org.
 .LP
 To report bugs and other problems, contribute patches, request a
 feature, provide generic feedback etc please see the file
-.I CONTRIBUTING
+.I CONTRIBUTING.md
 in the libpcap source tree root.

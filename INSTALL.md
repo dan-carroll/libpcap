@@ -41,8 +41,8 @@ You will need either Bison, Berkeley YACC, or a version of YACC
 compatible with them (if any exist), to build libpcap.  The configure
 script will abort if there isn't any such program.  If you don't have
 any such program, the current version of Bison can be found at
-http://ftp.gnu.org/gnu/bison/ and the current version of Berkeley YACC
-can be found at http://invisible-island.net/byacc/.
+https://ftp.gnu.org/gnu/bison/ and the current version of Berkeley YACC
+can be found at https://invisible-island.net/byacc/.
 
 Sometimes the stock C compiler does not interact well with Flex and
 Bison. The list of problems includes undefined references for alloca.
@@ -206,7 +206,7 @@ it appears that completely new code would need to be written to capture
 network traffic.  SCO do not appear to provide tcpdump binaries for
 OpenServer 5 or OpenServer 6 as part of SCO Skunkware:
 
-	http://www.sco.com/skunkware/
+  http://www.sco.com/skunkware/
 
 If you use UnixWare, you might be able to build libpcap from this
 release, or you might not.  We do not have a machine running UnixWare,
@@ -221,7 +221,7 @@ a Sun4, your version of Bison is broken. In any case version 1.16 or
 higher is recommended (1.14 is known to cause problems 1.16 is known to
 work). Either pick up a current version from:
 
-	http://ftp.gnu.org/gnu/bison/
+  https://ftp.gnu.org/gnu/bison/
 
 or hack around it by inserting the lines:
 
@@ -251,7 +251,7 @@ FILES
 	CHANGES		    - description of differences between releases
 	ChmodBPF/*	    - macOS startup item to set ownership and permissions on /dev/bpf*
 	CMakeLists.txt	    - CMake file
-	CONTRIBUTING	    - guidelines for contributing
+	CONTRIBUTING.md	    - guidelines for contributing
 	CREDITS		    - people that have helped libpcap along
 	INSTALL.md	    - this file
 	LICENSE		    - the license under which tcpdump is distributed

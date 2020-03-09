@@ -77,7 +77,7 @@ extern "C" {
  *    1) big enough for maximum-size Linux loopback packets (65549)
  *       and some USB packets captured with USBPcap:
  *
- *           http://desowin.org/usbpcap/
+ *           https://desowin.org/usbpcap/
  *
  *       (> 131072, < 262144)
  *
@@ -86,11 +86,28 @@ extern "C" {
  *    2) small enough not to cause attempts to allocate huge amounts of
  *       memory; some applications might use the snapshot length in a
  *       savefile header to control the size of the buffer they allocate,
- *       so a size of, say, 2^31-1 might not work well.
+ *       so a size of, say, 2^31-1 might not work well.  (libpcap uses it
+ *       as a hint, but doesn't start out allocating a buffer bigger than
+ *       2 KiB, and grows the buffer as necessary, but not beyond the
+ *       per-linktype maximum snapshot length.  Other code might naively
+ *       use it; we want to avoid writing a too-large snapshot length,
+ *       in order not to cause that code problems.)
  *
  * We don't enforce this in pcap_set_snaplen(), but we use it internally.
  */
 #define MAXIMUM_SNAPLEN		262144
+
+/*
+ * Locale-independent macros for testing character types.
+ * These can be passed any integral value, without worrying about, for
+ * example, sign-extending char values, unlike the C macros.
+ */
+#define PCAP_ISDIGIT(c) \
+	((c) >= '0' && (c) <= '9')
+#define PCAP_ISXDIGIT(c) \
+	(((c) >= '0' && (c) <= '9') || \
+	 ((c) >= 'A' && (c) <= 'F') || \
+	 ((c) >= 'a' && (c) <= 'f'))
 
 struct pcap_opt {
 	char	*device;
@@ -234,7 +251,7 @@ struct pcap {
 	 * pcap_t's with a required timeout, and the code must be
 	 * prepared not to see any packets from the attempt.
 	 */
-	struct timeval *required_select_timeout;
+	const struct timeval *required_select_timeout;
 #endif
 
 	/*
@@ -474,11 +491,15 @@ int	add_addr_to_if(pcap_if_list_t *, const char *, bpf_u_int32,
  * "pcap_open_offline_common()" allocates and fills in a pcap_t, for use
  * by pcap_open_offline routines.
  *
+ * "pcap_adjust_snapshot()" adjusts the snapshot to be non-zero and
+ * fit within an int.
+ *
  * "sf_cleanup()" closes the file handle associated with a pcap_t, if
  * appropriate, and frees all data common to all modules for handling
  * savefile types.
  */
 pcap_t	*pcap_open_offline_common(char *ebuf, size_t size);
+bpf_u_int32 pcap_adjust_snapshot(bpf_u_int32 linktype, bpf_u_int32 snaplen);
 void	sf_cleanup(pcap_t *p);
 
 /*

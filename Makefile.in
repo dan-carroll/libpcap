@@ -38,6 +38,7 @@ mandir = @mandir@
 
 # VPATH
 srcdir = @srcdir@
+top_srcdir = @top_srcdir@
 VPATH = @srcdir@
 
 #
@@ -290,12 +291,10 @@ EXTRA_DIST = \
 	missing/asprintf.c \
 	missing/getopt.c \
 	missing/getopt.h \
-	missing/snprintf.c \
 	missing/strlcat.c \
 	missing/strlcpy.c \
 	missing/strtok_r.c \
 	missing/win_asprintf.c \
-	missing/win_snprintf.c \
 	mkdep \
 	msdos/bin2c.c \
 	msdos/makefile \
@@ -325,6 +324,7 @@ EXTRA_DIST = \
 	pcap-dpdk.c \
 	pcap-dpdk.h \
 	pcap-enet.c \
+	pcap-haiku.cpp \
 	pcap-int.h \
 	pcap-libdlpi.c \
 	pcap-linux.c \
@@ -550,7 +550,6 @@ libpcap.pc: $(srcdir)/libpcap.pc.in ./config.status
 	@rm -f $@ $@.tmp
 	./config.status --file=$@.tmp:$(srcdir)/libpcap.pc.in
 	mv $@.tmp $@
-	chmod a+x $@
 
 #
 # Generate the pcap-config script.  See above.
@@ -782,7 +781,8 @@ tags: $(TAGFILES)
 	ctags -wtd $(TAGFILES)
 
 releasetar:
-	@cwd=`pwd` ; dir=`basename $$cwd` ; name=$(PROG)-`cat VERSION` ; \
+	@autoreconf -f; \
+	name=$(PROG)-`cat VERSION` ; \
 	   mkdir $$name; \
 	   tar -c --exclude='*~' -f - $(COMMON_C_SRC) $(HDR) $(MAN1) \
 	      $(MAN3PCAP_EXPAND) $(MAN3PCAP_NOEXPAND) $(MANFILE) \
@@ -791,9 +791,13 @@ releasetar:
 	   tar -c -z -f $$name.tar.gz $$name; \
 	   rm -rf $$name
 
+rc1 rc2 rc3 rc4 rc5:
+	@VER=`cat $(srcdir)/VERSION`; \
+	sed -i "s/$$VER/$${VER}$@/" VERSION ; \
+	make releasetar; \
+	git checkout VERSION
+
 depend:	$(GENERATED_C_SRC) $(GENHDR)
-	$(MKDEP) -c "$(CC)" -m "$(DEPENDENCY_CFLAG)" $(CFLAGS) $(DEFS) $(INCLS) $(SRC)
+	$(MKDEP) -c "$(CC)" -m "$(DEPENDENCY_CFLAG)" -s "$(srcdir)" $(CFLAGS) $(DEFS) $(INCLS) $(SRC)
 	cd rpcapd; $(MAKE) depend
 	cd testprogs; $(MAKE) depend
-
-

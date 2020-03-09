@@ -96,26 +96,17 @@
 /* Define to 1 if you have the <linux/compiler.h> header file. */
 #undef HAVE_LINUX_COMPILER_H
 
-/* Define to 1 if you have the <linux/ethtool.h> header file. */
-#undef HAVE_LINUX_ETHTOOL_H
-
 /* define if we have the Linux getnetbyname_r() */
 #undef HAVE_LINUX_GETNETBYNAME_R
 
 /* define if we have the Linux getprotobyname_r() */
 #undef HAVE_LINUX_GETPROTOBYNAME_R
 
-/* Define to 1 if you have the <linux/if_bonding.h> header file. */
-#undef HAVE_LINUX_IF_BONDING_H
-
 /* Define to 1 if you have the <linux/net_tstamp.h> header file. */
 #undef HAVE_LINUX_NET_TSTAMP_H
 
 /* Define to 1 if you have the <linux/socket.h> header file. */
 #undef HAVE_LINUX_SOCKET_H
-
-/* Define to 1 if you have the <linux/sockios.h> header file. */
-#undef HAVE_LINUX_SOCKIOS_H
 
 /* Define to 1 if you have the <linux/usbdevice_fs.h> header file. */
 #undef HAVE_LINUX_USBDEVICE_FS_H
@@ -180,9 +171,6 @@
 /* define if you have the Myricom SNF API */
 #undef HAVE_SNF_API
 
-/* Define to 1 if you have the `snprintf' function. */
-#undef HAVE_SNPRINTF
-
 /* Define to 1 if the system has the type `socklen_t'. */
 #undef HAVE_SOCKLEN_T
 
@@ -246,9 +234,6 @@
 /* Define to 1 if `tp_vlan_tci' is a member of `struct tpacket_auxdata'. */
 #undef HAVE_STRUCT_TPACKET_AUXDATA_TP_VLAN_TCI
 
-/* Define to 1 if the system has the type `struct tpacket_stats'. */
-#undef HAVE_STRUCT_TPACKET_STATS
-
 /* Define to 1 if `bRequestType' is a member of `struct
    usbdevfs_ctrltransfer'. */
 #undef HAVE_STRUCT_USBDEVFS_CTRLTRANSFER_BREQUESTTYPE
@@ -261,9 +246,6 @@
 
 /* Define to 1 if you have the <sys/dlpi.h> header file. */
 #undef HAVE_SYS_DLPI_H
-
-/* Define to 1 if you have the <sys/eventfd.h> header file. */
-#undef HAVE_SYS_EVENTFD_H
 
 /* Define to 1 if you have the <sys/ioccom.h> header file. */
 #undef HAVE_SYS_IOCCOM_H
@@ -288,9 +270,6 @@
 
 /* Define to 1 if you have the `vasprintf' function. */
 #undef HAVE_VASPRINTF
-
-/* Define to 1 if you have the `vsnprintf' function. */
-#undef HAVE_VSNPRINTF
 
 /* Define to 1 if you have the `vsyslog' function. */
 #undef HAVE_VSYSLOG
@@ -343,20 +322,17 @@
 /* target host supports DPDK */
 #undef PCAP_SUPPORT_DPDK
 
+/* target host supports Linux usbmon for USB sniffing */
+#undef PCAP_SUPPORT_LINUX_USBMON
+
 /* target host supports netfilter sniffing */
 #undef PCAP_SUPPORT_NETFILTER
 
 /* target host supports netmap */
 #undef PCAP_SUPPORT_NETMAP
 
-/* use packet ring capture support on Linux if available */
-#undef PCAP_SUPPORT_PACKET_RING
-
 /* target host supports RDMA sniffing */
 #undef PCAP_SUPPORT_RDMASNIFF
-
-/* target host supports USB sniffing */
-#undef PCAP_SUPPORT_USB
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS

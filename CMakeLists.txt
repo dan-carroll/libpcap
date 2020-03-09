@@ -1,4 +1,11 @@
-cmake_minimum_required(VERSION 2.8.6)
+if(WIN32)
+    #
+    # We need 3.12 or later, so that we can set policy CMP0074; see
+    # below.
+    cmake_minimum_required(VERSION 3.12)
+else(WIN32)
+    cmake_minimum_required(VERSION 2.8.6)
+endif(WIN32)
 
 #
 # Apple doesn't build with an install_name starting with @rpath, and
@@ -14,46 +21,29 @@ endif()
 # WE KNOW WHAT WE'RE DOING, WE'RE DOING EVERYTHING THE WAY THAT NEWER
 # VERSIONS OF CMAKE EXPECT BY DEFAULT, DON'T WASTE OUR TIME WITH NOISE.
 #
-cmake_policy(SET CMP0054 NEW)
+if(POLICY CMP0054)
+    cmake_policy(SET CMP0054 NEW)
+endif()
+
+#
+# We want find_file() and find_library() to honor {packagename}_ROOT,
+# as that appears to be the only way, with the Visual Studio 2019 IDE
+# and its CMake support, to tell CMake where to look for the Npcap
+# or WinPcap SDK.
+#
+if(POLICY CMP0074)
+    cmake_policy(SET CMP0074 NEW)
+endif()
 
 set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules)
 
 project(pcap)
 
-#
-# Try to enable as many C99 features as we can.
-# At minimum, we want C++/C99-style // comments.
-#
-# Newer versions of compilers might default to supporting C99, but older
-# versions may require a special flag.
-#
-# Prior to CMake 3.1, setting CMAKE_C_STANDARD will not have any effect,
-# so, unless and until we require CMake 3.1 or later, we have to do it
-# ourselves on pre-3.1 CMake, so we just do it ourselves on all versions
-# of CMake.
-#
-# Note: with CMake 3.1 through 3.5, the only compilers for which CMake
-# handles CMAKE_C_STANDARD are GCC and Clang.  3.6 adds support only
-# for Intel C; 3.9 adds support for PGI C, Sun C, and IBM XL C, and
-# 3.10 adds support for Cray C and IAR C, but no version of CMake has
-# support for HP C.  Therefore, even if we use CMAKE_C_STANDARD with
-# compilers for which CMake supports it, we may still have to do it
-# ourselves on other compilers.
-#
-# See the CMake documentation for the CMAKE_<LANG>_COMPILER_ID variables
-# for a list of compiler IDs.
-#
-# We don't worry about MSVC; it doesn't have such a flag - either it
-# doesn't support the C99 features we need at all, or it supports them
-# regardless of the compiler flag.
-#
-# XXX - this just tests whether the option works and adds it if it does.
-# We don't test whether it's necessary in order to get the C99 features
-# that we use; if we ever have a user who tries to compile with a compiler
-# that can't be made to support those features, we can add a test to make
-# sure we actually *have* C99 support.
-#
 include(CheckCCompilerFlag)
+
+#
+# For checking if a compiler flag works and adding it if it does.
+#
 macro(check_and_add_compiler_option _option)
     message(STATUS "Checking C compiler flag ${_option}")
     string(REPLACE "=" "-" _temp_option_variable ${_option})
@@ -64,31 +54,103 @@ macro(check_and_add_compiler_option _option)
     endif()
 endmacro()
 
+#
+# If we're building with Visual Studio, we require Visual Studio 2015,
+# in order to get sufficient C99 compatibility.  Check for that.
+#
+# If not, try the appropriate flag for the compiler to enable C99
+# features.
+#
 set(C_ADDITIONAL_FLAGS "")
-if(CMAKE_C_COMPILER_ID MATCHES "GNU" OR
-   CMAKE_C_COMPILER_ID MATCHES "Clang")
-    check_and_add_compiler_option("-std=gnu99")
-elseif(CMAKE_C_COMPILER_ID MATCHES "XL")
+if(MSVC)
+    if(MSVC_VERSION LESS 1900)
+        message(FATAL_ERROR "Visual Studio 2015 or later is required")
+    endif()
+
     #
-    # We want support for extensions picked up for GNU C compatibility,
-    # so we use -qlanglvl=extc99.
+    # Treat source files as being in UTF-8 with MSVC if it's not using
+    # the Clang front end.
+    # We assume that UTF-8 source is OK with other compilers and with
+    # MSVC if it's using the Clang front end.
     #
-    check_and_add_compiler_option("-qlanglvl=extc99")
-elseif(CMAKE_C_COMPILER_ID MATCHES "HP")
-    check_and_add_compiler_option("-AC99")
-elseif(CMAKE_C_COMPILER_ID MATCHES "Sun")
-    check_and_add_compiler_option("-xc99")
-elseif(CMAKE_C_COMPILER_ID MATCHES "Intel")
-    check_and_add_compiler_option("-c99")
-endif()
+    if(NOT ${CMAKE_C_COMPILER} MATCHES "clang*")
+        set(C_ADDITIONAL_FLAGS "${C_ADDITIONAL_FLAGS} /utf-8")
+    endif(NOT ${CMAKE_C_COMPILER} MATCHES "clang*")
+else(MSVC)
+    #
+    # For checking if a compiler flag works, failing if it doesn't,
+    # and adding it otherwise.
+    #
+    macro(require_and_add_compiler_option _option)
+        message(STATUS "Checking C compiler flag ${_option}")
+        string(REPLACE "=" "-" _temp_option_variable ${_option})
+        string(REGEX REPLACE "^-" "" _option_variable ${_temp_option_variable})
+        check_c_compiler_flag("${_option}" ${_option_variable})
+        if(${${_option_variable}})
+            set(C_ADDITIONAL_FLAGS "${C_ADDITIONAL_FLAGS} ${_option}")
+        else()
+            message(FATAL_ERROR "C99 support is required, but the compiler doesn't support a compiler flag to enable it")
+        endif()
+    endmacro()
+
+    #
+    # Try to enable as many C99 features as we can.
+    # At minimum, we want C++/C99-style // comments.
+    #
+    # Newer versions of compilers might default to supporting C99, but
+    # older versions may require a special flag.
+    #
+    # Prior to CMake 3.1, setting CMAKE_C_STANDARD will not have any effect,
+    # so, unless and until we require CMake 3.1 or later, we have to do it
+    # ourselves on pre-3.1 CMake, so we just do it ourselves on all versions
+    # of CMake.
+    #
+    # Note: with CMake 3.1 through 3.5, the only compilers for which CMake
+    # handles CMAKE_C_STANDARD are GCC and Clang.  3.6 adds support only
+    # for Intel C; 3.9 adds support for PGI C, Sun C, and IBM XL C, and
+    # 3.10 adds support for Cray C and IAR C, but no version of CMake has
+    # support for HP C.  Therefore, even if we use CMAKE_C_STANDARD with
+    # compilers for which CMake supports it, we may still have to do it
+    # ourselves on other compilers.
+    #
+    # See the CMake documentation for the CMAKE_<LANG>_COMPILER_ID variables
+    # for a list of compiler IDs.
+    #
+    # XXX - this just tests whether the option works, fails if it doesn't,
+    # and adds it if it does.  We don't test whether it's necessary in order
+    # to get the C99 features that we use, or whether, if it's used, it
+    # enables all the features that we require.
+    #
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU" OR
+       CMAKE_C_COMPILER_ID MATCHES "Clang")
+        require_and_add_compiler_option("-std=gnu99")
+    elseif(CMAKE_C_COMPILER_ID MATCHES "XL")
+        #
+        # We want support for extensions picked up for GNU C compatibility,
+        # so we use -qlanglvl=extc99.
+        #
+        require_and_add_compiler_option("-qlanglvl=extc99")
+    elseif(CMAKE_C_COMPILER_ID MATCHES "HP")
+        require_and_add_compiler_option("-AC99")
+    elseif(CMAKE_C_COMPILER_ID MATCHES "Sun")
+        require_and_add_compiler_option("-xc99")
+    elseif(CMAKE_C_COMPILER_ID MATCHES "Intel")
+        require_and_add_compiler_option("-c99")
+    endif()
+endif(MSVC)
 
 #
-# Treat source files as being in UTF-8 with MSVC.
-# We assume that UTF-8 source is OK with other compilers.
+# If we're building with MinGW, we need to specify _WIN32_WINNT as
+# 0x0600 ("NT 6.0", a/k/a Vista/Windows Server 2008) in order to
+# get the full IPv6 API, including inet_ntop().
 #
-if(MSVC AND NOT ${CMAKE_C_COMPILER} MATCHES "clang*")
-    set(C_ADDITIONAL_FLAGS "${C_ADDITIONAL_FLAGS} /utf-8")
-endif(MSVC AND NOT ${CMAKE_C_COMPILER} MATCHES "clang*")
+# NOTE: pcap does *NOT* work with msvcrt.dll; it must link with
+# a newer version of the C library, i.e. Visual Studio 2015 or
+# later, as it depends on C99 features introduced in VS 2015.
+#
+if(MINGW)
+    add_definitions(-D_WIN32_WINNT=0x0600)
+endif(MINGW)
 
 #
 # Build all runtimes in the top-level binary directory; that way,
@@ -122,7 +184,7 @@ if(WIN32)
 endif(WIN32)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 if(WIN32)
-    set(PACKET_DLL_DIR "" CACHE PATH "Path to directory with include and lib subdirectories for packet.dll")
+    set(Packet_ROOT "" CACHE PATH "Path to directory with include and lib subdirectories for packet.dll")
 endif(WIN32)
 
 # To pacify those who hate the protochain instruction
@@ -146,14 +208,15 @@ else()
 endif(WIN32)
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    option(PCAP_SUPPORT_PACKET_RING "Enable Linux packet ring support" ON)
     option(BUILD_WITH_LIBNL "Build with libnl" ON)
 endif()
 
 #
 # Additional capture modules.
 #
-option(DISABLE_USB "Disable USB sniffing support" OFF)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    option(DISABLE_LINUX_USBMON "Disable Linux usbmon USB sniffing support" OFF)
+endif()
 option(DISABLE_BLUETOOTH "Disable Bluetooth sniffing support" OFF)
 option(DISABLE_NETMAP "Disable netmap support" OFF)
 option(DISABLE_DPDK "Disable DPDK support" OFF)
@@ -333,18 +396,6 @@ main(void)
             HAVE_PF_NAT_THROUGH_PF_NORDR)
     endif(HAVE_NET_PFVAR_H)
     check_include_file(netinet/if_ether.h HAVE_NETINET_IF_ETHER_H)
-    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        check_include_file(linux/sockios.h HAVE_LINUX_SOCKIOS_H)
-        #
-        # linux/if_bonding.h requires sys/socket.h.
-        #
-        check_include_files("sys/socket.h;linux/if_bonding.h" HAVE_LINUX_IF_BONDING_H)
-
-        #
-        # Check for the eventfd header.
-        #
-        check_include_files("sys/eventfd.h" HAVE_SYS_EVENTFD_H)
-    endif()
 endif(NOT WIN32)
 
 #
@@ -380,10 +431,24 @@ else(HAVE_STRERROR_R)
     #
     check_function_exists(strerror_s HAVE_STRERROR_S)
 endif(HAVE_STRERROR_R)
+
+#
+# Make sure we have vsnprintf() and snprintf(); we require them.
+# We use check_symbol_exists(), as they aren't necessarily external
+# functions - in Visual Studio, for example, they're inline functions
+# calling a common external function.
+#
+check_symbol_exists(vsnprintf "stdio.h" HAVE_VSNPRINTF)
+if(NOT HAVE_VSNPRINTF)
+    message(FATAL_ERROR "vsnprintf() is required but wasn't found")
+endif(NOT HAVE_VSNPRINTF)
+check_symbol_exists(snprintf "stdio.h" HAVE_SNPRINTF)
+if(NOT HAVE_SNPRINTF)
+    message(FATAL_ERROR "snprintf() is required but wasn't found")
+endif()
+
 check_function_exists(strlcpy HAVE_STRLCPY)
 check_function_exists(strlcat HAVE_STRLCAT)
-check_function_exists(snprintf HAVE_SNPRINTF)
-check_function_exists(vsnprintf HAVE_VSNPRINTF)
 check_function_exists(asprintf HAVE_ASPRINTF)
 check_function_exists(vasprintf HAVE_VASPRINTF)
 check_function_exists(strtok_r HAVE_STRTOK_R)
@@ -962,52 +1027,13 @@ set(PROJECT_SOURCE_LIST_C
 
 if(WIN32)
     #
-    # For now, we assume we don't have snprintf() or that it's not one
-    # that behaves enough like C99's snprintf() for our purposes (i.e.,
-    # it doesn't null-terminate the string if it truncates it to fit in
-    # the buffer), so we have to provide our own (a wrapper around
-    # _snprintf() that null-terminates the buffer).
-    #
-    # We also assume we don't have asprintf(), and provide an implementation
+    # We assume we don't have asprintf(), and provide an implementation
     # that uses _vscprintf() to determine how big the string needs to be.
     #
     set(PROJECT_SOURCE_LIST_C ${PROJECT_SOURCE_LIST_C}
-        missing/win_snprintf.c missing/win_asprintf.c)
+        missing/win_asprintf.c)
 else()
-    #
-    # Either:
-    #
-    #	we have snprintf() and vsnprintf(), and have asprintf() and
-    #	vasprintf();
-    #
-    #	we have snprintf() and vsnprintf(), but don't have asprintf()
-    #	or vasprintf();
-    #
-    #	we have neither snprintf() nor vsnprintf(), and don't have
-    #	asprintf() or vasprintf(), either.
-    #
-    # We assume that if we have asprintf() we have vasprintf(), as well
-    # as snprintf() and vsnprintf(), and that if we have snprintf() we
-    # have vsnprintf().
-    #
-    # For the first case, we don't need any replacement routines.
-    # For the second case, we need replacement asprintf()/vasprintf()
-    # routines.
-    # For the third case, we need replacement snprintf()/vsnprintf() and
-    # asprintf()/vasprintf() routines.
-    #
-    if(NOT HAVE_SNPRINTF)
-        #
-        # We assume we have none of them; missing/snprintf.c supplies
-        # all of them.
-        #
-        set(PROJECT_SOURCE_LIST_C ${PROJECT_SOURCE_LIST_C} missing/snprintf.c)
-    elif(NOT HAVE_ASPRINTF)
-        #
-        # We assume we have snprintf()/vsnprintf() but lack
-        # asprintf()/vasprintf(); missing/asprintf.c supplies
-        # the latter (using vsnprintf()).
-        #
+    if(NOT HAVE_ASPRINTF)
         set(PROJECT_SOURCE_LIST_C ${PROJECT_SOURCE_LIST_C} missing/asprintf.c)
     endif()
     if(NOT HAVE_STRLCAT)
@@ -1290,22 +1316,9 @@ else(WIN32)
                     endif()
                 endif()
             endif()
+        else()
+            unset(HAVE_LIBNL CACHE) # check_function_exists stores results in cache
         endif()
-
-        check_include_file(linux/ethtool.h HAVE_LINUX_ETHTOOL_H)
-
-        #
-        # Checks to see if tpacket_stats is defined in linux/if_packet.h
-        # If so then pcap-linux.c can use this to report proper statistics.
-        #
-        # XXX - there's no check_type() macro that's like check_type_size()
-        # except that it only checks for the existence of the structure type,
-        # so we use check_type_size() and ignore the size.
-        #
-        cmake_push_check_state()
-        set(CMAKE_EXTRA_INCLUDE_FILES linux/if_packet.h)
-        check_type_size("struct tpacket_stats" STRUCT_TPACKET_STATS)
-        cmake_pop_check_state()
 
         check_struct_has_member("struct tpacket_auxdata" tp_vlan_tci linux/if_packet.h HAVE_STRUCT_TPACKET_AUXDATA_TP_VLAN_TCI)
     elseif(PCAP_TYPE STREQUAL "bpf")
@@ -1452,11 +1465,13 @@ endif()
 # Check for additional native sniffing capabilities.
 #
 
-# Check for USB sniffing support on Linux.
-# On FreeBSD, it uses BPF, so we don't need to do anything special here.
-if(NOT DISABLE_USB)
-    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        set(PCAP_SUPPORT_USB TRUE)
+#
+# Various Linux-specific mechanisms.
+#
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    # Check for usbmon USB sniffing support.
+    if(NOT DISABLE_LINUX_USBMON)
+        set(PCAP_SUPPORT_LINUX_USBMON TRUE)
         set(PROJECT_SOURCE_LIST_C ${PROJECT_SOURCE_LIST_C} pcap-usb-linux.c)
         set(LINUX_USB_MON_DEV /dev/usbmon)
         #
@@ -1486,10 +1501,9 @@ if(NOT DISABLE_USB)
             endif(HAVE_LINUX_COMPILER_H)
         endif()
     endif()
-endif()
 
-# Check for netfilter sniffing support.
-if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+    #
+    # Check for netfilter sniffing support.
     #
     # Life's too short to deal with trying to get this to compile
     # if you don't get the right types defined with
@@ -1608,6 +1622,8 @@ main(void)
             endif(HAVE_STRUCT_SOCKADDR_HCI_HCI_CHANNEL)
         endif(HAVE_BLUETOOTH_BLUETOOTH_H)
     endif()
+else()
+    unset(PCAP_SUPPORT_BT_MONITOR CACHE)
 endif()
 
 # Check for Bluetooth sniffing support
@@ -2153,7 +2169,7 @@ add_subdirectory(testprogs)
 #
 # See
 #
-#  http://public.kitware.com/pipermail/cmake/2013-August/055510.html
+#  https://public.kitware.com/pipermail/cmake/2013-August/055510.html
 #
 add_custom_target(SerializeTarget
     DEPENDS
@@ -2409,12 +2425,11 @@ set(LIBRARY_NAME_STATIC ${LIBRARY_NAME}_static)
 
 function(install_manpage_symlink SOURCE TARGET MANDIR)
     if(MINGW)
-        find_program(LINK_EXECUTABLE ln)
-            if(LINK_EXECUTABLE)
-                set(LINK_COMMAND "\"${LINK_EXECUTABLE}\" \"-s\" \"${SOURCE}\" \"${TARGET}\"")
-            else(LINK_EXECUTABLE)
-                message(FATAL_ERROR "ln (http://pubs.opengroup.org/onlinepubs/9699919799/utilities/ln.html) not found.")
-            endif(LINK_EXECUTABLE)
+        #
+        # If we haven't found an ln executable with MinGW, we don't try
+        # generating and installing the man pages, so if we get here,
+        # we've found that executable.
+        set(LINK_COMMAND "\"${LINK_EXECUTABLE}\" \"-s\" \"${SOURCE}\" \"${TARGET}\"")
     else(MINGW)
         set(LINK_COMMAND "\"${CMAKE_COMMAND}\" \"-E\" \"create_symlink\" \"${SOURCE}\" \"${TARGET}\"")
     endif(MINGW)
@@ -2512,19 +2527,19 @@ endif(NOT BUILD_SHARED_LIBS)
 if(WIN32)
     if(MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
         #
-        # Install 64-bit code built with MSVC in the amd64 subdirectories,
+        # Install 64-bit code built with MSVC in the x64 subdirectories,
         # as that's where it expects it to be.
         #
         install(TARGETS ${LIBRARY_NAME} ${LIBRARY_NAME_STATIC}
-                RUNTIME DESTINATION bin/amd64
-                LIBRARY DESTINATION lib/amd64
-                ARCHIVE DESTINATION lib/amd64)
+                RUNTIME DESTINATION bin/x64
+                LIBRARY DESTINATION lib/x64
+                ARCHIVE DESTINATION lib/x64)
         if(NOT MINGW)
             install(FILES $<TARGET_FILE_DIR:${LIBRARY_NAME_STATIC}>/${LIBRARY_NAME_STATIC}.pdb
-                    DESTINATION bin/amd64 OPTIONAL)
+                    DESTINATION bin/x64 OPTIONAL)
             if(BUILD_SHARED_LIBS)
                 install(FILES $<TARGET_PDB_FILE:${LIBRARY_NAME}>
-                        DESTINATION bin/amd64 OPTIONAL)
+                        DESTINATION bin/x64 OPTIONAL)
             endif(BUILD_SHARED_LIBS)
         endif(NOT MINGW)
     else(MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
@@ -2547,7 +2562,7 @@ if(WIN32)
         endif(NOT MINGW)
     endif(MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
 else(WIN32)
-    install(TARGETS ${LIBRARY_NAME} ${LIBRARY_NAME_STATIC} DESTINATION lib)
+    install(TARGETS ${LIBRARY_NAME} ${LIBRARY_NAME_STATIC} DESTINATION ${CMAKE_INSTALL_FULL_LIBDIR})
 endif(WIN32)
 
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/pcap/ DESTINATION include/pcap)
@@ -2562,7 +2577,7 @@ if(NOT MSVC)
     set(prefix ${CMAKE_INSTALL_PREFIX})
     set(exec_prefix "\${prefix}")
     set(includedir "\${prefix}/include")
-    set(libdir "\${exec_prefix}/lib")
+    set(libdir "\${exec_prefix}/${CMAKE_INSTALL_LIBDIR}")
     if(CMAKE_SYSTEM_NAME STREQUAL "FreeBSD" OR
        CMAKE_SYSTEM_NAME STREQUAL "NetBSD" OR
        CMAKE_SYSTEM_NAME STREQUAL "OpenBSD" OR
@@ -2604,54 +2619,63 @@ if(NOT MSVC)
     # For each section of the manual for which we have man pages
     # that require macro expansion, do the expansion.
     #
-    set(MAN1 "")
-    foreach(MANPAGE ${MAN1_NOEXPAND})
-        set(MAN1 ${MAN1} ${CMAKE_CURRENT_SOURCE_DIR}/${MANPAGE})
-    endforeach(MANPAGE)
-    install(FILES ${MAN1} DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
+    # If this is MinGW, maybe we have a UN*X-style ln command and
+    # maybe we don't.  (No, we do *NOT* require MSYS!)  If we don't
+    # have it, don't do the man pages.
+    #
+    if(MINGW)
+        find_program(LINK_EXECUTABLE ln)
+    endif(MINGW)
+    if(UNIX OR (MINGW AND LINK_EXECUTABLE))
+        set(MAN1 "")
+        foreach(MANPAGE ${MAN1_NOEXPAND})
+            set(MAN1 ${MAN1} ${CMAKE_CURRENT_SOURCE_DIR}/${MANPAGE})
+        endforeach(MANPAGE)
+        install(FILES ${MAN1} DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
-    set(MAN3PCAP "")
-    foreach(MANPAGE ${MAN3PCAP_NOEXPAND})
-        set(MAN3PCAP ${MAN3PCAP} ${CMAKE_CURRENT_SOURCE_DIR}/${MANPAGE})
-    endforeach(MANPAGE)
-    foreach(TEMPLATE_MANPAGE ${MAN3PCAP_EXPAND})
-        string(REPLACE ".in" "" MANPAGE ${TEMPLATE_MANPAGE})
-        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/${TEMPLATE_MANPAGE} ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE} @ONLY)
-        set(MAN3PCAP ${MAN3PCAP} ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE})
-    endforeach(TEMPLATE_MANPAGE)
-    install(FILES ${MAN3PCAP} DESTINATION ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_datalink_val_to_name.3pcap pcap_datalink_val_to_description.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_dump_open.3pcap pcap_dump_fopen.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_findalldevs.3pcap pcap_freealldevs.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_geterr.3pcap pcap_perror.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_inject.3pcap pcap_sendpacket.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_list_datalinks.3pcap pcap_free_datalinks.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_list_tstamp_types.3pcap pcap_free_tstamp_types.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_loop.3pcap pcap_dispatch.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_major_version.3pcap pcap_minor_version.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_next_ex.3pcap pcap_next.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_open_dead.3pcap pcap_open_dead_with_tstamp_precision.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_open_offline.3pcap pcap_open_offline_with_tstamp_precision.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_open_offline.3pcap pcap_fopen_offline.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_open_offline.3pcap pcap_fopen_offline_with_tstamp_precision.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_tstamp_type_val_to_name.3pcap pcap_tstamp_type_val_to_description.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
-    install_manpage_symlink(pcap_setnonblock.3pcap pcap_getnonblock.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        set(MAN3PCAP "")
+        foreach(MANPAGE ${MAN3PCAP_NOEXPAND})
+            set(MAN3PCAP ${MAN3PCAP} ${CMAKE_CURRENT_SOURCE_DIR}/${MANPAGE})
+        endforeach(MANPAGE)
+        foreach(TEMPLATE_MANPAGE ${MAN3PCAP_EXPAND})
+            string(REPLACE ".in" "" MANPAGE ${TEMPLATE_MANPAGE})
+            configure_file(${CMAKE_CURRENT_SOURCE_DIR}/${TEMPLATE_MANPAGE} ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE} @ONLY)
+            set(MAN3PCAP ${MAN3PCAP} ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE})
+        endforeach(TEMPLATE_MANPAGE)
+        install(FILES ${MAN3PCAP} DESTINATION ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_datalink_val_to_name.3pcap pcap_datalink_val_to_description.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_dump_open.3pcap pcap_dump_fopen.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_findalldevs.3pcap pcap_freealldevs.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_geterr.3pcap pcap_perror.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_inject.3pcap pcap_sendpacket.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_list_datalinks.3pcap pcap_free_datalinks.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_list_tstamp_types.3pcap pcap_free_tstamp_types.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_loop.3pcap pcap_dispatch.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_major_version.3pcap pcap_minor_version.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_next_ex.3pcap pcap_next.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_open_dead.3pcap pcap_open_dead_with_tstamp_precision.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_open_offline.3pcap pcap_open_offline_with_tstamp_precision.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_open_offline.3pcap pcap_fopen_offline.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_open_offline.3pcap pcap_fopen_offline_with_tstamp_precision.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_tstamp_type_val_to_name.3pcap pcap_tstamp_type_val_to_description.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
+        install_manpage_symlink(pcap_setnonblock.3pcap pcap_getnonblock.3pcap ${CMAKE_INSTALL_MANDIR}/man3)
 
-    set(MANFILE "")
-    foreach(TEMPLATE_MANPAGE ${MANFILE_EXPAND})
-        string(REPLACE ".manfile.in" ".${MAN_FILE_FORMATS}" MANPAGE ${TEMPLATE_MANPAGE})
-        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/${TEMPLATE_MANPAGE} ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE} @ONLY)
-        set(MANFILE ${MANFILE} ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE})
-    endforeach(TEMPLATE_MANPAGE)
-    install(FILES ${MANFILE} DESTINATION ${CMAKE_INSTALL_MANDIR}/man${MAN_FILE_FORMATS})
+        set(MANFILE "")
+        foreach(TEMPLATE_MANPAGE ${MANFILE_EXPAND})
+            string(REPLACE ".manfile.in" ".${MAN_FILE_FORMATS}" MANPAGE ${TEMPLATE_MANPAGE})
+            configure_file(${CMAKE_CURRENT_SOURCE_DIR}/${TEMPLATE_MANPAGE} ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE} @ONLY)
+            set(MANFILE ${MANFILE} ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE})
+        endforeach(TEMPLATE_MANPAGE)
+        install(FILES ${MANFILE} DESTINATION ${CMAKE_INSTALL_MANDIR}/man${MAN_FILE_FORMATS})
 
-    set(MANMISC "")
-    foreach(TEMPLATE_MANPAGE ${MANMISC_EXPAND})
-        string(REPLACE ".manmisc.in" ".${MAN_MISC_INFO}" MANPAGE ${TEMPLATE_MANPAGE})
-        configure_file(${CMAKE_CURRENT_SOURCE_DIR}/${TEMPLATE_MANPAGE} ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE} @ONLY)
-        set(MANMISC ${MANMISC} ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE})
-    endforeach(TEMPLATE_MANPAGE)
-    install(FILES ${MANMISC} DESTINATION ${CMAKE_INSTALL_MANDIR}/man${MAN_MISC_INFO})
+        set(MANMISC "")
+        foreach(TEMPLATE_MANPAGE ${MANMISC_EXPAND})
+            string(REPLACE ".manmisc.in" ".${MAN_MISC_INFO}" MANPAGE ${TEMPLATE_MANPAGE})
+            configure_file(${CMAKE_CURRENT_SOURCE_DIR}/${TEMPLATE_MANPAGE} ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE} @ONLY)
+            set(MANMISC ${MANMISC} ${CMAKE_CURRENT_BINARY_DIR}/${MANPAGE})
+        endforeach(TEMPLATE_MANPAGE)
+        install(FILES ${MANMISC} DESTINATION ${CMAKE_INSTALL_MANDIR}/man${MAN_MISC_INFO})
+    endif(UNIX OR (MINGW AND LINK_EXECUTABLE))
 endif(NOT MSVC)
 
 # uninstall target

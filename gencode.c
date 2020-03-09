@@ -67,7 +67,7 @@
 #include "grammar.h"
 #include "scanner.h"
 
-#if defined(linux) && defined(PF_PACKET) && defined(SO_ATTACH_FILTER)
+#if defined(linux)
 #include <linux/types.h>
 #include <linux/if_packet.h>
 #include <linux/filter.h>
@@ -443,7 +443,7 @@ bpf_set_error(compiler_state_t *cstate, const char *fmt, ...)
 	 */
 	if (!cstate->error_set) {
 		va_start(ap, fmt);
-		(void)pcap_vsnprintf(cstate->bpf_pcap->errbuf, PCAP_ERRBUF_SIZE,
+		(void)vsnprintf(cstate->bpf_pcap->errbuf, PCAP_ERRBUF_SIZE,
 		    fmt, ap);
 		va_end(ap);
 		cstate->error_set = 1;
@@ -463,7 +463,7 @@ bpf_error(compiler_state_t *cstate, const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	(void)pcap_vsnprintf(cstate->bpf_pcap->errbuf, PCAP_ERRBUF_SIZE,
+	(void)vsnprintf(cstate->bpf_pcap->errbuf, PCAP_ERRBUF_SIZE,
 	    fmt, ap);
 	va_end(ap);
 	longjmp(cstate->top_ctx, 1);
@@ -732,7 +732,7 @@ pcap_compile(pcap_t *p, struct bpf_program *program,
 	 * link-layer type, so we can't use it.
 	 */
 	if (!p->activated) {
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 		    "not-yet-activated pcap_t passed to pcap_compile");
 		return (-1);
 	}
@@ -780,7 +780,7 @@ pcap_compile(pcap_t *p, struct bpf_program *program,
 
 	cstate.snaplen = pcap_snapshot(p);
 	if (cstate.snaplen == 0) {
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 			 "snaplen of 0 rejects all packets");
 		rc = -1;
 		goto quit;
@@ -831,7 +831,7 @@ pcap_compile(pcap_t *p, struct bpf_program *program,
 		}
 		if (cstate.ic.root == NULL ||
 		    (cstate.ic.root->s.code == (BPF_RET|BPF_K) && cstate.ic.root->s.k == 0)) {
-			(void)pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+			(void)snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 			    "expression rejects all packets");
 			rc = -1;
 			goto quit;
@@ -6947,11 +6947,15 @@ gen_mcode(compiler_state_t *cstate, const char *s1, const char *s2,
 		return (NULL);
 
 	nlen = __pcap_atoin(s1, &n);
+	if (nlen < 0)
+		bpf_error(cstate, "invalid IPv4 address '%s'", s1);
 	/* Promote short ipaddr */
 	n <<= 32 - nlen;
 
 	if (s2 != NULL) {
 		mlen = __pcap_atoin(s2, &m);
+		if (mlen < 0)
+			bpf_error(cstate, "invalid IPv4 address '%s'", s2);
 		/* Promote short ipaddr */
 		m <<= 32 - mlen;
 		if ((n & ~m) != 0)
@@ -7009,8 +7013,11 @@ gen_ncode(compiler_state_t *cstate, const char *s, bpf_u_int32 v, struct qual q)
 		vlen = __pcap_atodn(s, &v);
 		if (vlen == 0)
 			bpf_error(cstate, "malformed decnet address '%s'", s);
-	} else
+	} else {
 		vlen = __pcap_atoin(s, &v);
+		if (vlen < 0)
+			bpf_error(cstate, "invalid IPv4 address '%s'", s);
+	}
 
 	switch (q.addr) {
 
@@ -7131,10 +7138,10 @@ gen_mcode6(compiler_state_t *cstate, const char *s1, const char *s2,
 		bpf_error(cstate, "%s resolved to multiple address", s1);
 	addr = &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
 
-	if (sizeof(mask) * 8 < masklen)
-		bpf_error(cstate, "mask length must be <= %u", (unsigned int)(sizeof(mask) * 8));
+	if (masklen > sizeof(mask.s6_addr) * 8)
+		bpf_error(cstate, "mask length must be <= %u", (unsigned int)(sizeof(mask.s6_addr) * 8));
 	memset(&mask, 0, sizeof(mask));
-	memset(&mask, 0xff, masklen / 8);
+	memset(&mask.s6_addr, 0xff, masklen / 8);
 	if (masklen % 8) {
 		mask.s6_addr[masklen / 8] =
 			(0xff << (8 - masklen % 8)) & 0xff;
@@ -8295,9 +8302,9 @@ gen_inbound(compiler_state_t *cstate, int dir)
 		 * with newer capture APIs, allowing it to be saved
 		 * in pcapng files.
 		 */
-#if defined(linux) && defined(PF_PACKET) && defined(SO_ATTACH_FILTER)
+#if defined(linux)
 		/*
-		 * This is Linux with PF_PACKET support.
+		 * This is Linux; we assume it has PF_PACKET support.
 		 * If this is a *live* capture, we can look at
 		 * special meta-data in the filter expression;
 		 * if it's a savefile, we can't.
@@ -8315,11 +8322,11 @@ gen_inbound(compiler_state_t *cstate, int dir)
 			/* to filter on inbound traffic, invert the match */
 			gen_not(b0);
 		}
-#else /* defined(linux) && defined(PF_PACKET) && defined(SO_ATTACH_FILTER) */
+#else /* defined(linux) */
 		bpf_error(cstate, "inbound/outbound not supported on %s",
 		    pcap_datalink_val_to_description_or_dlt(cstate->linktype));
 		/*NOTREACHED*/
-#endif /* defined(linux) && defined(PF_PACKET) && defined(SO_ATTACH_FILTER) */
+#endif /* defined(linux) */
 	}
 	return (b0);
 }
@@ -9127,29 +9134,8 @@ gen_pppoes(compiler_state_t *cstate, bpf_u_int32 sess_num, int has_sess_num)
 	 * the PPP packet, and note that this is PPPoE rather than
 	 * raw PPP.
 	 *
-	 * XXX - this is a bit of a kludge.  If we were to split the
-	 * compiler into a parser that parses an expression and
-	 * generates an expression tree, and a code generator that
-	 * takes an expression tree (which could come from our
-	 * parser or from some other parser) and generates BPF code,
-	 * we could perhaps make the offsets parameters of routines
-	 * and, in the handler for an "AND" node, pass to subnodes
-	 * other than the PPPoE node the adjusted offsets.
-	 *
-	 * This would mean that "pppoes" would, instead of changing the
-	 * behavior of *all* tests after it, change only the behavior
-	 * of tests ANDed with it.  That would change the documented
-	 * semantics of "pppoes", which might break some expressions.
-	 * However, it would mean that "(pppoes and ip) or ip" would check
-	 * both for VLAN-encapsulated IP and IP-over-Ethernet, rather than
-	 * checking only for VLAN-encapsulated IP, so that could still
-	 * be considered worth doing; it wouldn't break expressions
-	 * that are of the form "pppoes and ..." which I suspect are the
-	 * most common expressions involving "pppoes".  "pppoes or ..."
-	 * doesn't necessarily do what the user would really want, now,
-	 * as all the "or ..." tests would be done assuming PPPoE, even
-	 * though the "or" could be viewed as meaning "or, if this isn't
-	 * a PPPoE packet...".
+	 * XXX - this is a bit of a kludge.  See the comments in
+	 * gen_vlan().
 	 *
 	 * The "network-layer" protocol is PPPoE, which has a 6-byte
 	 * PPPoE header, followed by a PPP packet.

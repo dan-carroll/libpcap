@@ -55,6 +55,8 @@
   #include <dagapi.h>
 #endif /* HAVE_DAG_API */
 
+#include "diag-control.h"
+
 static int pcap_setfilter_npf(pcap_t *, struct bpf_program *);
 static int pcap_setfilter_win32_dag(pcap_t *, struct bpf_program *);
 static int pcap_getnonblock_npf(pcap_t *);
@@ -155,7 +157,7 @@ oid_get_request(ADAPTER *adapter, bpf_u_int32 oid, void *data, size_t *lenp,
 	 */
 	oid_data_arg = malloc(sizeof (PACKET_OID_DATA) + *lenp);
 	if (oid_data_arg == NULL) {
-		pcap_snprintf(errbuf, PCAP_ERRBUF_SIZE,
+		snprintf(errbuf, PCAP_ERRBUF_SIZE,
 		    "Couldn't allocate argument buffer for PacketRequest");
 		return (PCAP_ERROR);
 	}
@@ -240,13 +242,13 @@ pcap_stats_npf(pcap_t *p, struct pcap_stat *ps)
  * have an API that returns data in a form like the Options section of a
  * pcapng Interface Statistics Block:
  *
- *    http://xml2rfc.tools.ietf.org/cgi-bin/xml2rfc.cgi?url=https://raw.githubusercontent.com/pcapng/pcapng/master/draft-tuexen-opsawg-pcapng.xml&modeAsFormat=html/ascii&type=ascii#rfc.section.4.6
+ *    https://xml2rfc.tools.ietf.org/cgi-bin/xml2rfc.cgi?url=https://raw.githubusercontent.com/pcapng/pcapng/master/draft-tuexen-opsawg-pcapng.xml&modeAsFormat=html/ascii&type=ascii#rfc.section.4.6
  *
  * which would let us add new statistics straightforwardly and indicate which
  * statistics we are and are *not* providing, rather than having to provide
  * possibly-bogus values for statistics we can't provide.
  */
-struct pcap_stat *
+static struct pcap_stat *
 pcap_stats_ex_npf(pcap_t *p, int *pcap_stat_size)
 {
 	struct pcap_win *pw = p->priv;
@@ -283,7 +285,7 @@ pcap_setbuff_npf(pcap_t *p, int dim)
 
 	if(PacketSetBuff(pw->adapter,dim)==FALSE)
 	{
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "driver error: not enough memory to allocate the kernel buffer");
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "driver error: not enough memory to allocate the kernel buffer");
 		return (-1);
 	}
 	return (0);
@@ -297,7 +299,7 @@ pcap_setmode_npf(pcap_t *p, int mode)
 
 	if(PacketSetMode(pw->adapter,mode)==FALSE)
 	{
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "driver error: working mode not recognized");
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "driver error: working mode not recognized");
 		return (-1);
 	}
 
@@ -312,7 +314,7 @@ pcap_setmintocopy_npf(pcap_t *p, int size)
 
 	if(PacketSetMinToCopy(pw->adapter, size)==FALSE)
 	{
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "driver error: unable to set the requested mintocopy size");
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "driver error: unable to set the requested mintocopy size");
 		return (-1);
 	}
 	return (0);
@@ -350,7 +352,7 @@ pcap_oid_set_request_npf(pcap_t *p, bpf_u_int32 oid, const void *data,
 	 */
 	oid_data_arg = malloc(sizeof (PACKET_OID_DATA) + *lenp);
 	if (oid_data_arg == NULL) {
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 		    "Couldn't allocate argument buffer for PacketRequest");
 		return (PCAP_ERROR);
 	}
@@ -384,7 +386,7 @@ pcap_sendqueue_transmit_npf(pcap_t *p, pcap_send_queue *queue, int sync)
 	u_int res;
 
 	if (pw->adapter==NULL) {
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 		    "Cannot transmit a queue to an offline capture or to a TurboCap port");
 		return (0);
 	}
@@ -409,7 +411,7 @@ pcap_setuserbuffer_npf(pcap_t *p, int size)
 
 	if (size<=0) {
 		/* Bogus parameter */
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 		    "Error: invalid size %d",size);
 		return (-1);
 	}
@@ -418,7 +420,7 @@ pcap_setuserbuffer_npf(pcap_t *p, int size)
 	new_buff=(unsigned char*)malloc(sizeof(char)*size);
 
 	if (!new_buff) {
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 		    "Error: not enough memory");
 		return (-1);
 	}
@@ -440,7 +442,7 @@ pcap_live_dump_npf(pcap_t *p, char *filename, int maxsize, int maxpacks)
 	/* Set the packet driver in dump mode */
 	res = PacketSetMode(pw->adapter, PACKET_MODE_DUMP);
 	if(res == FALSE){
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 		    "Error setting dump mode");
 		return (-1);
 	}
@@ -448,7 +450,7 @@ pcap_live_dump_npf(pcap_t *p, char *filename, int maxsize, int maxpacks)
 	/* Set the name of the dump file */
 	res = PacketSetDumpName(pw->adapter, filename, (int)strlen(filename));
 	if(res == FALSE){
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 		    "Error setting kernel dump file name");
 		return (-1);
 	}
@@ -456,8 +458,8 @@ pcap_live_dump_npf(pcap_t *p, char *filename, int maxsize, int maxpacks)
 	/* Set the limits of the dump file */
 	res = PacketSetDumpLimits(pw->adapter, maxsize, maxpacks);
 	if(res == FALSE) {
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
-		    		"Error setting dump limit");
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+				"Error setting dump limit");
 		return (-1);
 	}
 
@@ -472,17 +474,21 @@ pcap_live_dump_ended_npf(pcap_t *p, int sync)
 	return (PacketIsDumpEnded(pw->adapter, (BOOLEAN)sync));
 }
 
+#ifdef HAVE_AIRPCAP_API
 static PAirpcapHandle
 pcap_get_airpcap_handle_npf(pcap_t *p)
 {
-#ifdef HAVE_AIRPCAP_API
 	struct pcap_win *pw = p->priv;
 
 	return (PacketGetAirPcapHandle(pw->adapter));
-#else
-	return (NULL);
-#endif /* HAVE_AIRPCAP_API */
 }
+#else /* HAVE_AIRPCAP_API */
+static PAirpcapHandle
+pcap_get_airpcap_handle_npf(pcap_t *p _U_)
+{
+	return (NULL);
+}
+#endif /* HAVE_AIRPCAP_API */
 
 static int
 pcap_read_npf(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
@@ -544,7 +550,7 @@ pcap_read_npf(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 				 * documented as having error returns
 				 * other than PCAP_ERROR or PCAP_ERROR_BREAK.
 				 */
-				pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+				snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 				    "The interface disappeared");
 			} else {
 				pcap_fmt_errmsg_for_win32_err(p->errbuf,
@@ -706,7 +712,7 @@ pcap_read_win32_dag(pcap_t *p, int cnt, pcap_handler callback, u_char *user)
 		 */
 		PacketInitPacket(&Packet, (BYTE *)p->buffer, p->bufsize);
 		if (!PacketReceivePacket(pw->adapter, &Packet, TRUE)) {
-			pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "read error: PacketReceivePacket failed");
+			snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "read error: PacketReceivePacket failed");
 			return (-1);
 		}
 
@@ -855,7 +861,7 @@ pcap_inject_npf(pcap_t *p, const void *buf, int size)
 
 	PacketInitPacket(&pkt, (PVOID)buf, size);
 	if(PacketSendPacket(pw->adapter,&pkt,TRUE) == FALSE) {
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "send error: PacketSendPacket failed");
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "send error: PacketSendPacket failed");
 		return (-1);
 	}
 
@@ -943,12 +949,22 @@ pcap_activate_npf(pcap_t *p)
 		/*
 		 * What error did we get when trying to open the adapter?
 		 */
-		if (errcode == ERROR_BAD_UNIT) {
+		switch (errcode) {
+
+		case ERROR_BAD_UNIT:
 			/*
 			 * There's no such device.
 			 */
 			return (PCAP_ERROR_NO_SUCH_DEVICE);
-		} else {
+
+		case ERROR_ACCESS_DENIED:
+			/*
+			 * There is, but we don't have permission to
+			 * use it.
+			 */
+			return (PCAP_ERROR_PERM_DENIED);
+
+		default:
 			/*
 			 * Unknown - report details.
 			 */
@@ -1063,7 +1079,7 @@ pcap_activate_npf(pcap_t *p)
 		 * some programs will report the warning.
 		 */
 		p->linktype = DLT_EN10MB;
-		pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+		snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 		    "Unknown NdisMedium value %d, defaulting to DLT_EN10MB",
 		    type.LinkType);
 		status = PCAP_WARNING;
@@ -1087,7 +1103,7 @@ pcap_activate_npf(pcap_t *p)
 
 		if (PacketSetHwFilter(pw->adapter,NDIS_PACKET_TYPE_PROMISCUOUS) == FALSE)
 		{
-			pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "failed to set hardware filter to promiscuous mode");
+			snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "failed to set hardware filter to promiscuous mode");
 			goto bad;
 		}
 	}
@@ -1105,7 +1121,7 @@ pcap_activate_npf(pcap_t *p)
 			NDIS_PACKET_TYPE_BROADCAST |
 			NDIS_PACKET_TYPE_MULTICAST) == FALSE)
 		{
-			pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "failed to set hardware filter to non-promiscuous mode");
+			snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "failed to set hardware filter to non-promiscuous mode");
 			goto bad;
 		}
 	}
@@ -1122,12 +1138,12 @@ pcap_activate_npf(pcap_t *p)
 		 * If the buffer size wasn't explicitly set, default to
 		 * WIN32_DEFAULT_KERNEL_BUFFER_SIZE.
 		 */
-	 	if (p->opt.buffer_size == 0)
-	 		p->opt.buffer_size = WIN32_DEFAULT_KERNEL_BUFFER_SIZE;
+		if (p->opt.buffer_size == 0)
+			p->opt.buffer_size = WIN32_DEFAULT_KERNEL_BUFFER_SIZE;
 
 		if(PacketSetBuff(pw->adapter,p->opt.buffer_size)==FALSE)
 		{
-			pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "driver error: not enough memory to allocate the kernel buffer");
+			snprintf(p->errbuf, PCAP_ERRBUF_SIZE, "driver error: not enough memory to allocate the kernel buffer");
 			goto bad;
 		}
 
@@ -1176,7 +1192,7 @@ pcap_activate_npf(pcap_t *p)
 		int		postype = 0;
 		char	keyname[512];
 
-		pcap_snprintf(keyname, sizeof(keyname), "%s\\CardParams\\%s",
+		snprintf(keyname, sizeof(keyname), "%s\\CardParams\\%s",
 			"SYSTEM\\CurrentControlSet\\Services\\DAG",
 			strstr(_strlwr(p->opt.device), "dag"));
 		do
@@ -1222,7 +1238,7 @@ pcap_activate_npf(pcap_t *p)
 	{
 		if (!PacketSetLoopbackBehavior(pw->adapter, NPF_DISABLE_LOOPBACK))
 		{
-			pcap_snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
+			snprintf(p->errbuf, PCAP_ERRBUF_SIZE,
 			    "Unable to disable the capture of loopback packets.");
 			goto bad;
 		}
@@ -1607,6 +1623,12 @@ get_if_flags(const char *name, bpf_u_int32 *flags, char *errbuf)
 			 * running.
 			 */
 			break;
+
+		default:
+			/*
+			 * Unknown.
+			 */
+			break;
 		}
 	} else {
 		/*
@@ -1694,6 +1716,12 @@ get_if_flags(const char *name, bpf_u_int32 *flags, char *errbuf)
 			 */
 			*flags |= PCAP_IF_CONNECTION_STATUS_DISCONNECTED;
 			break;
+
+		default:
+			/*
+			 * It's unknown whether it's connected or not.
+			 */
+			break;
 		}
 	}
 #else
@@ -1776,7 +1804,7 @@ pcap_platform_finddevs(pcap_if_list_t *devlistp, char *errbuf)
 	AdaptersName = (char*) malloc(NameLength);
 	if (AdaptersName == NULL)
 	{
-		pcap_snprintf(errbuf, PCAP_ERRBUF_SIZE, "Cannot allocate enough memory to list the adapters.");
+		snprintf(errbuf, PCAP_ERRBUF_SIZE, "Cannot allocate enough memory to list the adapters.");
 		return (-1);
 	}
 
@@ -1872,10 +1900,10 @@ pcap_lookupdev(char *errbuf)
 	DWORD dwVersion;
 	DWORD dwWindowsMajorVersion;
 
-#pragma warning (push)
-#pragma warning (disable: 4996) /* disable MSVC's GetVersion() deprecated warning here */
+/* disable MSVC's GetVersion() deprecated warning here */
+DIAG_OFF_DEPRECATION
 	dwVersion = GetVersion();	/* get the OS version */
-#pragma warning (pop)
+DIAG_ON_DEPRECATION
 	dwWindowsMajorVersion = (DWORD)(LOBYTE(LOWORD(dwVersion)));
 
 	if (dwVersion >= 0x80000000 && dwWindowsMajorVersion >= 4) {
@@ -1906,7 +1934,7 @@ pcap_lookupdev(char *errbuf)
 
 		if(TAdaptersName == NULL)
 		{
-			(void)pcap_snprintf(errbuf, PCAP_ERRBUF_SIZE, "memory allocation failure");
+			(void)snprintf(errbuf, PCAP_ERRBUF_SIZE, "memory allocation failure");
 			return NULL;
 		}
 

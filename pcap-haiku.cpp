@@ -166,7 +166,7 @@ pcap_activate_haiku(pcap_t *handle)
 			 pcap_strerror(errno) );
 		return PCAP_ERROR;
 	}
-	
+
 	handle->bufsize = 65536;
 	// TODO: should be determined by interface MTU
 
@@ -192,7 +192,7 @@ pcap_activate_haiku(pcap_t *handle)
 extern "C" pcap_t *
 pcap_create_interface(const char *device, char *errorBuffer)
 {
-	// TODO: handle promiscous mode!
+	// TODO: handle promiscuous mode!
 
 	// we need a socket to talk to the networking stack
 	int socket = ::socket(AF_INET, SOCK_DGRAM, 0);
@@ -248,7 +248,7 @@ pcap_create_interface(const char *device, char *errorBuffer)
 
 	handle->selectable_fd = socket;
 	handle->fd = socket;
-	
+
 	handle->activate_op = pcap_activate_haiku;
 
 	return handle;

@@ -425,14 +425,14 @@ AC_DEFUN(AC_LBL_CHECK_DEPENDENCY_GENERATION_OPT,
 		if AC_RUN_LOG([eval "$CC $ac_lbl_dependency_flag conftest.c >/dev/null 2>&1"]); then
 			AC_MSG_RESULT([yes, with $ac_lbl_dependency_flag])
 			DEPENDENCY_CFLAG="$ac_lbl_dependency_flag"
-			MKDEP='${srcdir}/mkdep'
+			MKDEP='${top_srcdir}/mkdep'
 		else
 			AC_MSG_RESULT([no])
 			#
 			# We can't run mkdep, so have "make depend" do
 			# nothing.
 			#
-			MKDEP='${srcdir}/nomkdep'
+			MKDEP='${top_srcdir}/nomkdep'
 		fi
 		rm -rf conftest*
 	else
@@ -441,7 +441,7 @@ AC_DEFUN(AC_LBL_CHECK_DEPENDENCY_GENERATION_OPT,
 		# We can't run mkdep, so have "make depend" do
 		# nothing.
 		#
-		MKDEP='${srcdir}/nomkdep'
+		MKDEP='${top_srcdir}/nomkdep'
 	fi
 	AC_SUBST(DEPENDENCY_CFLAG)
 	AC_SUBST(MKDEP)
@@ -485,7 +485,7 @@ AC_DEFUN(AC_LBL_SHLIBS_INIT,
 		    ;;
 
 	    freebsd*|netbsd*|openbsd*|dragonfly*|linux*|osf*|haiku*|midipix*)
-	    	    #
+		    #
 		    # Platforms where the linker is the GNU linker
 		    # or accepts command-line arguments like
 		    # those the GNU linker accepts.
@@ -501,7 +501,7 @@ AC_DEFUN(AC_LBL_SHLIBS_INIT,
 		    sparc64*)
 			case "$host_os" in
 
-			freebsd*|openbsd*)
+			freebsd*|openbsd*|linux*)
 			    PIC_OPT=-fPIC
 			    ;;
 			esac
@@ -514,7 +514,7 @@ AC_DEFUN(AC_LBL_SHLIBS_INIT,
 
 	    hpux*)
 		    V_SHLIB_CCOPT="$V_SHLIB_CCOPT -fpic"
-	    	    #
+		    #
 		    # XXX - this assumes GCC is using the HP linker,
 		    # rather than the GNU linker, and that the "+h"
 		    # option is used on all HP-UX platforms, both .sl
@@ -590,7 +590,7 @@ AC_DEFUN(AC_LBL_SHLIBS_INIT,
 		    ;;
 
 	    osf*)
-	    	    #
+		    #
 		    # Presumed to be DEC OSF/1, Digital UNIX, or
 		    # Tru64 UNIX.
 		    #
@@ -1173,7 +1173,7 @@ path to pkg-config.
 
 _PKG_TEXT
 
-To get pkg-config, see <http://pkg-config.freedesktop.org/>.])[]dnl
+To get pkg-config, see <https://pkg-config.freedesktop.org/>.])[]dnl
         ])
 else
 	$1[]_CFLAGS=$pkg_cv_[]$1[]_CFLAGS
